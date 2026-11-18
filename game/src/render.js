@@ -427,8 +427,8 @@ export function createRenderer(canvas) {
 
   function drawHud(state) {
     context.textBaseline = 'top';
-    text(scoreLabel(state.score), 24, 18, 30, PALETTE.text, 'left');
-    text(waveLabel(state.level), FIELD.width / 2, 18, 30, PALETTE.text, 'center');
+    text(scoreLabel(state.score), 24, 22, 30, PALETTE.text, 'left');
+    text(waveLabel(state.level), FIELD.width / 2, 22, 30, PALETTE.text, 'center');
     const prog = (state.elapsed % LEVEL.seconds) / LEVEL.seconds;
     const bw = 160;
     context.fillStyle = 'rgba(255,255,255,0.22)';
@@ -462,7 +462,7 @@ export function createRenderer(canvas) {
       context.closePath();
       context.fill();
       // The key that selects this colour, under its diamond: the legend doubles as a control hint.
-      text(String(color.id + 1), cx, ringY + COLOR_SIZE + 6, 15, PALETTE.muted, 'center');
+      text(String(color.id + 1), cx, ringY + COLOR_SIZE + 11, 15, PALETTE.muted, 'center');
     }
     context.globalAlpha = 1;
     if (state.combo >= 2) text(comboLabel(state.combo), 24, 56, 22, PALETTE.gold, 'left');
