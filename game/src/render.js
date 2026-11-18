@@ -4,7 +4,7 @@
 // neon without the cost of shadowBlur. Text that holds a number is rebuilt only when the number
 // changes, so a frame allocates nothing. Shards are faceted crystals; the ship has an engine
 // trail and a shield ring; power-ups carry a glyph.
-import { COLORS, FIELD, FONT, LEVEL, LIVES, PALETTE, POWERUP_DEFS, SHIP } from './config.js';
+import { BOSS, COLORS, FIELD, FONT, LEVEL, LIVES, PALETTE, POWERUP_DEFS, SHARD_KINDS, SHIP } from './config.js';
 
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -154,16 +154,11 @@ export function createRenderer(canvas) {
     }
   }
 
-  function drawGem(cx, cy, r, color, spin) {
+  /** The gem's body and facet, no halo — ghosts and the boss reuse it. */
+  function drawGemShape(cx, cy, r, color, spin) {
     context.save();
     context.translate(cx, cy);
     context.rotate(spin || 0);
-    context.globalAlpha = 0.3;
-    context.fillStyle = color;
-    context.beginPath();
-    context.arc(0, 0, r * 2.4, 0, Math.PI * 2);
-    context.fill();
-    context.globalAlpha = 1;
     context.fillStyle = color;
     context.beginPath();
     context.moveTo(0, -r);
@@ -183,6 +178,20 @@ export function createRenderer(canvas) {
     context.restore();
   }
 
+  function drawGem(cx, cy, r, color, spin) {
+    context.save();
+    context.translate(cx, cy);
+    context.rotate(spin || 0);
+    context.globalAlpha = 0.3;
+    context.fillStyle = color;
+    context.beginPath();
+    context.arc(0, 0, r * 2.4, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = 1;
+    context.restore();
+    drawGemShape(cx, cy, r, color, spin);
+  }
+
   function drawShards(state) {
     for (const shard of state.shards) {
       if (!shard.active) continue;
@@ -196,7 +205,94 @@ export function createRenderer(canvas) {
         context.fill();
         continue;
       }
+      // A drifter's ghost trail: where the sine carried it a few moments ago.
+      if (shard.drift) {
+        for (let k = 3; k >= 1; k -= 1) {
+          const phase = (state.elapsed - shard.t0 - k * 0.35) * SHARD_KINDS.driftFreq;
+          const gx = shard.baseX - shard.size / 2 + Math.sin(phase) * SHARD_KINDS.driftAmp + shard.size / 2;
+          context.globalAlpha = 0.26 - k * 0.05;
+          drawGemShape(gx, cy, shard.size * 0.5, COLORS[shard.color].fill, shard.spin);
+        }
+        context.globalAlpha = 1;
+      }
       drawGem(cx, cy, shard.size * 0.5, COLORS[shard.color].fill, shard.spin);
+      // Armour: a steel ring with rivets, gone after one beam.
+      if (shard.armor) {
+        context.strokeStyle = '#cfd8ea';
+        context.lineWidth = 3.5;
+        context.globalAlpha = 0.95;
+        context.beginPath();
+        context.arc(cx, cy, shard.size * 0.68, 0, Math.PI * 2);
+        context.stroke();
+        context.fillStyle = '#cfd8ea';
+        for (let r = 0; r < 4; r += 1) {
+          const a = shard.spin + (r * Math.PI) / 2;
+          context.beginPath();
+          context.arc(cx + Math.cos(a) * shard.size * 0.68, cy + Math.sin(a) * shard.size * 0.68, 2.5, 0, Math.PI * 2);
+          context.fill();
+        }
+        context.globalAlpha = 1;
+      }
+    }
+  }
+
+  /** The prism titan: three nested crystals turning against each other, a white core, and a row
+   *  of gold pips that reads as boss health without a word of text. */
+  function drawBoss(state) {
+    const boss = state.boss;
+    if (!boss) return;
+    const cy = boss.y + Math.sin(boss.t * 1.3) * 10;
+    const g = context.createRadialGradient(boss.x, cy, 10, boss.x, cy, BOSS.size * 1.1);
+    g.addColorStop(0, 'rgba(255,255,255,0.16)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = g;
+    context.fillRect(boss.x - BOSS.size * 1.2, cy - BOSS.size * 1.2, BOSS.size * 2.4, BOSS.size * 2.4);
+    const layers = [COLORS[0].fill, COLORS[1].fill, COLORS[2].fill];
+    for (let i = 0; i < 3; i += 1) {
+      const r = BOSS.size * (0.5 - i * 0.13);
+      context.save();
+      context.translate(boss.x, cy);
+      context.rotate(boss.t * 0.35 * (i % 2 === 0 ? 1 : -1));
+      context.globalAlpha = 0.85;
+      context.fillStyle = layers[i];
+      context.beginPath();
+      for (let p = 0; p < 6; p += 1) {
+        const a = (p * Math.PI) / 3;
+        const rr = p % 2 === 0 ? r : r * 0.62;
+        const px = Math.cos(a) * rr;
+        const py = Math.sin(a) * rr;
+        if (p === 0) context.moveTo(px, py);
+        else context.lineTo(px, py);
+      }
+      context.closePath();
+      context.fill();
+      context.restore();
+    }
+    context.globalAlpha = 1;
+    context.fillStyle = '#eef2ff';
+    context.beginPath();
+    context.arc(boss.x, cy, BOSS.size * 0.1, 0, Math.PI * 2);
+    context.fill();
+    if (boss.flash > 0) {
+      context.strokeStyle = '#ffffff';
+      context.lineWidth = 5;
+      context.globalAlpha = Math.min(1, boss.flash * 5);
+      context.beginPath();
+      context.arc(boss.x, cy, BOSS.size * 0.55, 0, Math.PI * 2);
+      context.stroke();
+      context.globalAlpha = 1;
+    }
+    const pipsY = cy - BOSS.size * 0.62 - 8;
+    for (let p = 0; p < boss.maxHp; p += 1) {
+      const px = boss.x - (boss.maxHp - 1) * 7 + p * 14;
+      context.fillStyle = p < boss.hp ? PALETTE.gold : 'rgba(255,255,255,0.15)';
+      context.beginPath();
+      context.moveTo(px, pipsY - 6);
+      context.lineTo(px + 6, pipsY);
+      context.lineTo(px, pipsY + 6);
+      context.lineTo(px - 6, pipsY);
+      context.closePath();
+      context.fill();
     }
   }
 
@@ -366,7 +462,7 @@ export function createRenderer(canvas) {
       context.closePath();
       context.fill();
       // The key that selects this colour, under its diamond: the legend doubles as a control hint.
-      text(String(color.id + 1), cx, ringY + COLOR_SIZE + 6, 13, PALETTE.muted, 'center');
+      text(String(color.id + 1), cx, ringY + COLOR_SIZE + 6, 15, PALETTE.muted, 'center');
     }
     context.globalAlpha = 1;
     if (state.combo >= 2) text(comboLabel(state.combo), 24, 56, 22, PALETTE.gold, 'left');
@@ -383,10 +479,11 @@ export function createRenderer(canvas) {
     if (state.slowTime > 0) {
       text(`SLOW ${Math.ceil(state.slowTime)}s`, 24, chipY, 18, '#b18bff', 'left');
     }
-    // The wave banner: a brief shout when a new wave starts, proof the game has progression.
+    // The wave banner: a brief shout when a new wave starts, proof the game has progression. It
+    // steps down to mid-field when the titan is up — dead centre is its stage, not the banner's.
     if (state.banner && state.banner.time > 0) {
       context.globalAlpha = Math.min(1, state.banner.time * 1.4);
-      text(state.banner.text, FIELD.width / 2, 196, 68, PALETTE.gold, 'center');
+      text(state.banner.text, FIELD.width / 2, state.boss ? 340 : 196, 68, PALETTE.gold, 'center');
       context.globalAlpha = 1;
     }
   }
@@ -547,6 +644,7 @@ export function createRenderer(canvas) {
     const oy = fx ? fx.shakeOffset() : 0;
     context.setTransform(view.scale, 0, 0, view.scale, view.x + ox * view.scale, view.y + oy * view.scale);
     drawBackground();
+    drawBoss(state);
     drawBeams(state);
     drawShards(state);
     drawPowerups(state);

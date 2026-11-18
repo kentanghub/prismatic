@@ -3,7 +3,7 @@
 // combo streak, the shield/slow/triple/bomb effects, lives and level. step() advances one fixed
 // step and returns what happened as bit flags, so the caller can react (sound, particles, screens)
 // without the world knowing about them. Nothing here allocates after createWorld returns.
-import { BEAM, COLORS, FIELD, GOLD, LEVEL, LIVES, POOL_BEAMS, POOL_POWERUPS, POOL_SHARDS, POWERUP, POWERUP_DEFS, POWERUP_ORDER, SHARD, SHIP } from './config.js';
+import { BEAM, BOSS, COLORS, FIELD, GOLD, LEVEL, LIVES, POOL_BEAMS, POOL_POWERUPS, POOL_SHARDS, POWERUP, POWERUP_DEFS, POWERUP_ORDER, SHARD, SHARD_KINDS, SHIP } from './config.js';
 
 export const EVENT_MATCH = 1;
 export const EVENT_SPLIT = 2;
@@ -13,6 +13,8 @@ export const EVENT_OVER = 16;
 export const EVENT_POWERUP = 32;
 export const EVENT_BOMB = 64;
 export const EVENT_SHIELD = 128;
+export const EVENT_ARMOR = 256;
+export const EVENT_BOSS = 512;
 
 function overlaps(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -30,7 +32,7 @@ export function createWorld(random) {
   };
   const shards = [];
   for (let i = 0; i < POOL_SHARDS; i += 1) {
-    shards.push({ active: false, gold: false, color: 0, scale: 1, x: 0, y: 0, size: SHARD.size, speed: 0, split: false, spin: 0 });
+    shards.push({ active: false, gold: false, color: 0, scale: 1, x: 0, y: 0, size: SHARD.size, speed: 0, split: false, spin: 0, armor: false, drift: false, baseX: 0, t0: 0 });
   }
   const beams = [];
   for (let i = 0; i < POOL_BEAMS; i += 1) {
@@ -56,6 +58,8 @@ export function createWorld(random) {
     slowTime: 0,
     elapsed: 0,
     banner: null,
+    boss: null,
+    lastBossLevel: 0,
     shardTimer: SHARD.interval,
     goldTimer: GOLD.interval,
     powerupTimer: POWERUP.interval,
@@ -83,6 +87,8 @@ export function createWorld(random) {
     state.slowTime = 0;
     state.elapsed = 0;
     state.banner = null;
+    state.boss = null;
+    state.lastBossLevel = 0;
     state.shardTimer = SHARD.interval;
     state.goldTimer = GOLD.interval;
     state.powerupTimer = POWERUP.interval;
@@ -117,6 +123,10 @@ export function createWorld(random) {
     shard.speed = SHARD.speed + SHARD.speedPerLevel * (state.level - 1) + random() * SHARD.speedJitter;
     shard.split = false;
     shard.spin = random() * Math.PI * 2;
+    shard.armor = random() < SHARD_KINDS.armorChance;
+    shard.drift = !shard.armor && random() < SHARD_KINDS.driftChance;
+    shard.baseX = shard.x + shard.size / 2;
+    shard.t0 = state.elapsed;
   }
 
   function spawnSplit(parent) {
@@ -135,6 +145,10 @@ export function createWorld(random) {
       shard.speed = parent.speed * 1.15;
       shard.split = true;
       shard.spin = random() * Math.PI * 2;
+      shard.armor = false;
+      shard.drift = false;
+      shard.baseX = shard.x + shard.size / 2;
+      shard.t0 = state.elapsed;
     }
   }
 
@@ -151,6 +165,10 @@ export function createWorld(random) {
     shard.speed = GOLD.speed + GOLD.speedPerLevel * (state.level - 1);
     shard.split = false;
     shard.spin = 0;
+    shard.armor = false;
+    shard.drift = false;
+    shard.baseX = shard.x + shard.size / 2;
+    shard.t0 = state.elapsed;
   }
 
   function spawnPowerup() {
@@ -215,6 +233,11 @@ export function createWorld(random) {
       state.maxLevel = state.level;
       state.banner = { text: `WAVE ${state.level}`, time: 1.6 };
     }
+    // The titan owns the sky from the fourth wave, one per wave.
+    if (state.level % BOSS.everyWaves === 0 && state.level > state.lastBossLevel && state.boss === null) {
+      state.lastBossLevel = state.level;
+      state.boss = { x: FIELD.width / 2, y: BOSS.y, hp: BOSS.hp, maxHp: BOSS.hp, t: 0, flash: 0 };
+    }
     if (state.banner) {
       state.banner.time -= dt;
       if (state.banner.time <= 0) state.banner = null;
@@ -234,11 +257,11 @@ export function createWorld(random) {
     if (player.tripleTime > 0) player.tripleTime = Math.max(0, player.tripleTime - dt);
     if (state.slowTime > 0) state.slowTime = Math.max(0, state.slowTime - dt);
 
-    // Spawn shards, gold and power-ups.
+    // Spawn shards, gold and power-ups. The titan hurries its brood along.
     state.shardTimer -= dt;
     if (state.shardTimer <= 0) {
       spawnShard();
-      state.shardTimer += shardInterval();
+      state.shardTimer += shardInterval() * (state.boss ? 1 / BOSS.spawnBoost : 1);
     }
     state.goldTimer -= dt;
     if (state.goldTimer <= 0) {
@@ -267,12 +290,23 @@ export function createWorld(random) {
       }
     }
 
-    // Move shards down; a shard that reaches the bottom edge costs a shield, else a life.
+    // Move shards down; drifters ride their sine; a shard that reaches the bottom edge costs a
+    // shield, else a life.
     const slowFactor = state.slowTime > 0 ? 0.5 : 1;
+    if (state.boss) {
+      const boss = state.boss;
+      boss.t += dt;
+      boss.flash = Math.max(0, boss.flash - dt);
+      boss.x = FIELD.width / 2 + Math.sin((boss.t * Math.PI * 2) / BOSS.period) * BOSS.drift;
+    }
     for (const shard of shards) {
       if (!shard.active) continue;
       shard.y += shard.speed * slowFactor * dt;
       shard.spin += dt * 1.5;
+      if (shard.drift) {
+        const phase = (state.elapsed - shard.t0) * SHARD_KINDS.driftFreq;
+        shard.x = Math.min(FIELD.width - shard.size, Math.max(0, shard.baseX - shard.size / 2 + Math.sin(phase) * SHARD_KINDS.driftAmp));
+      }
       if (shard.y > FIELD.groundY) {
         shard.active = false;
         if (harmless || shard.gold) continue;
@@ -298,6 +332,23 @@ export function createWorld(random) {
         continue;
       }
       const box = { x: beam.x, y: beam.y, w: BEAM.width, h: 22 };
+      // The titan soaks the beam first: it sits high in the sky, so most beams meet it there.
+      if (state.boss) {
+        const boss = state.boss;
+        const bbox = { x: boss.x - BOSS.size / 2, y: boss.y - BOSS.size / 2, w: BOSS.size, h: BOSS.size };
+        if (overlaps(box, bbox)) {
+          beam.active = false;
+          boss.hp -= 1;
+          boss.flash = 0.18;
+          if (boss.hp <= 0) {
+            state.score += BOSS.points;
+            if (state.lives < 5) state.lives += 1;
+            state.boss = null;
+            events |= EVENT_BOSS;
+          }
+          continue;
+        }
+      }
       for (const shard of shards) {
         if (!shard.active) continue;
         const sbox = { x: shard.x, y: shard.y, w: shard.size, h: shard.size };
@@ -312,6 +363,13 @@ export function createWorld(random) {
             state.goldCount = 0;
           }
           events |= EVENT_GOLD;
+          break;
+        }
+        // Armour soaks one beam, whatever its colour; the bare gem behind it answers as usual.
+        if (shard.armor) {
+          shard.armor = false;
+          beam.active = false;
+          events |= EVENT_ARMOR;
           break;
         }
         if (shard.color === beam.color) {

@@ -73,6 +73,16 @@ export const sound = {
   shieldBreak() {
     note(660, 0.08, 0.14, 520);
   },
+  /** Armour pops: a higher, tighter clink. */
+  armor() {
+    note(990, 0.06, 0.12, 700);
+  },
+  /** The titan breaks: a deep three-note fall. */
+  boss() {
+    note(110, 0.5, 0.3, 55);
+    note(220, 0.35, 0.2, 110);
+    note(440, 0.5, 0.22);
+  },
   /** Colour switch: a tiny rising blip. */
   switchc() {
     note(520, 0.05, 0.1);

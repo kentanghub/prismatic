@@ -5,13 +5,12 @@
 // shards over the ship, beams mid-climb, power-ups falling, the shield ring up — so each frame
 // shows the game at its best, the way a game's own screenshot mode poses a scene. Everything in
 // the frame is the real renderer drawing real game objects; only their placement is staged.
-import { BEAM, POWERUP, SHARD, STEP } from './config.js';
+import { BEAM, BOSS, POWERUP, SHARD, SHARD_KINDS, STEP } from './config.js';
 import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
 
-const START_SECONDS = 8;
-
-/** Place one shard from the pool with everything a live shard carries. */
-function placeShard(state, x, y, color, speed, spin) {
+/** Place one shard from the pool with everything a live shard carries. `opts.armor` rings it in
+ *  steel; `opts.drift` poses its sine so the shard sits at x with its ghost trail arcing behind. */
+function placeShard(state, x, y, color, speed, spin, opts = {}) {
   const shard = state.shards.find((s) => !s.active);
   if (!shard) return;
   shard.active = true;
@@ -19,11 +18,20 @@ function placeShard(state, x, y, color, speed, spin) {
   shard.color = color;
   shard.scale = 1;
   shard.size = SHARD.size;
-  shard.x = x;
+  shard.x = x - shard.size / 2;
   shard.y = y;
   shard.speed = speed;
   shard.split = false;
   shard.spin = spin;
+  shard.armor = !!opts.armor;
+  shard.drift = !!opts.drift;
+  shard.t0 = state.elapsed;
+  if (opts.drift) {
+    shard.t0 = state.elapsed - 0.6;
+    shard.baseX = x - Math.sin(0.6 * SHARD_KINDS.driftFreq) * SHARD_KINDS.driftAmp;
+  } else {
+    shard.baseX = x;
+  }
 }
 
 function placeGold(state, x, y, speed) {
@@ -69,7 +77,7 @@ function placeBeam(state, centerX, y, color) {
 export function stageShot(name, world) {
   world.reset();
   const state = world.state;
-  if (name !== 'play' && name !== 'end' && name !== 'power') {
+  if (name !== 'play' && name !== 'end' && name !== 'boss') {
     // The title's backdrop: crystals framing the edges, kept clear of the title band (y < 160,
     // x 360-920), the prism column and every line of text.
     placeShard(state, 110, 190, 0, 160, 1.2);
@@ -89,7 +97,7 @@ export function stageShot(name, world) {
     return { screen: SCREEN_TITLE, best: 0 };
   }
   const end = name === 'end';
-  const showcase = name === 'power';
+  const showcase = name === 'boss';
 
   // The mid-game story each frame tells: real wave, real score, a best combo worth bragging about.
   state.level = showcase ? 4 : 3;
@@ -113,35 +121,37 @@ export function stageShot(name, world) {
   state.player.fireTimer = 0;
 
   if (showcase) {
-    // The power shot: the triple beam fanned wide, catching a mint stack mid-chain.
-    placeBeam(state, 566, 540, 1);
-    placeBeam(state, 588, 500, 1);
-    placeBeam(state, 610, 540, 1);
-    placeShard(state, 562, 470, 1, 150, 0.3);
-    placeShard(state, 556, 350, 1, 155, 2.0);
-    placeShard(state, 570, 230, 2, 160, 3.7);
-    // A scatter across the field: every colour, several heights, all mid-fall.
-    placeShard(state, 180, 200, 0, 168, 1.1);
-    placeShard(state, 300, 90, 2, 175, 4.4);
-    placeShard(state, 120, 470, 2, 158, 2.6);
-    placeShard(state, 420, 300, 0, 152, 4.9);
-    placeShard(state, 840, 160, 0, 149, 5.1);
-    placeShard(state, 950, 330, 2, 170, 0.8);
-    placeShard(state, 1090, 520, 0, 144, 3.2);
-    placeShard(state, 1150, 210, 1, 178, 1.7);
-    // Gold in open sky, two power-ups on the way down.
-    placeGold(state, 1020, 90, 190);
-    placePowerup(state, 'bomb', 760, 330);
-    placePowerup(state, 'shield', 320, 560);
+    // The boss shot: the prism titan mid-fight — pips half spent, an impact flash bright on its
+    // shell, a triple fan rising to meet it, its brood falling around the ship.
+    state.boss = { x: 640, y: BOSS.y, hp: 7, maxHp: BOSS.hp, t: 2.2, flash: 0.16 };
+    state.player.x = 612;
+    placeBeam(state, 640, 240, 1);
+    placeBeam(state, 600, 430, 1);
+    placeBeam(state, 680, 430, 1);
+    // The two new shard kinds, where the eye lands: armoured on the right, drifter on the left.
+    placeShard(state, 830, 360, 2, 165, 1.2, { armor: true });
+    placeShard(state, 300, 330, 0, 150, 2.0, { drift: true });
+    // Its brood, mid-fall.
+    placeShard(state, 150, 140, 1, 168, 1.1);
+    placeShard(state, 450, 120, 0, 175, 4.4);
+    placeShard(state, 1050, 150, 1, 149, 5.1);
+    placeShard(state, 1150, 300, 2, 170, 0.8);
+    placeShard(state, 180, 520, 2, 158, 2.6);
+    placeShard(state, 980, 480, 0, 144, 3.2);
+    placeShard(state, 1090, 560, 1, 178, 1.7);
+    placeShard(state, 500, 560, 2, 152, 4.9);
+    placeGold(state, 930, 80, 190);
+    placePowerup(state, 'bomb', 400, 480);
+    placePowerup(state, 'slow', 770, 560);
     return {
       screen: SCREEN_PLAY,
       best: state.score,
       seedFx: [
-        { kind: 'burst', x: 600, y: 430, color: '#2cf08f', count: 26 },
-        { kind: 'text', x: 628, y: 400, text: '+120', color: '#2cf08f' },
-        { kind: 'burst', x: 170, y: 540, color: '#ff4d6d', count: 14 },
-        { kind: 'text', x: 196, y: 512, text: '+90', color: '#ff4d6d' },
-        { kind: 'shake', amount: 4 },
+        { kind: 'burst', x: 708, y: 205, color: '#ffd24d', count: 26 },
+        { kind: 'text', x: 742, y: 178, text: '+25', color: '#ffd24d' },
+        { kind: 'burst', x: 190, y: 560, color: '#2cf08f', count: 12 },
+        { kind: 'text', x: 218, y: 532, text: '+20', color: '#2cf08f' },
+        { kind: 'shake', amount: 5 },
       ],
     };
   }

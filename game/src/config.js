@@ -78,6 +78,28 @@ export const POWERUP_DEFS = {
 
 export const POWERUP_ORDER = ['shield', 'triple', 'slow', 'bomb'];
 
+/** The prism titan: a boss crystal that owns the sky every 4th wave. It soaks beams, drops shards
+ *  faster while it lives, and pays a fortune plus a life when it breaks. */
+export const BOSS = {
+  size: 130,
+  hp: 12,
+  drift: 150,
+  period: 9,
+  y: 150,
+  points: 500,
+  everyWaves: 4,
+  spawnBoost: 2.2,
+};
+
+/** Extra shard kinds: some arrive wearing a steel ring (two hits), some ride a sine wave (their
+ *  ghost trail shows the path). Both read at a glance, which is the point. */
+export const SHARD_KINDS = {
+  armorChance: 0.16,
+  driftChance: 0.12,
+  driftAmp: 46,
+  driftFreq: 2.2,
+};
+
 /** Seconds of play per level and the last level: speeds and spawn rates stop growing there. */
 export const LEVEL = { seconds: 14, max: 12 };
 

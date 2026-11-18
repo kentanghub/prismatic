@@ -4,9 +4,9 @@
 // title, play, paused and game over. ?seed=N fixes the random stream; ?shot=start|play|end (with
 // &seed=N) stages that scene instead of running the loop and sets window.__shotReady for a
 // screenshot, as the kit's shots.json drives.
-import { BEST_KEY, COLORS, FIELD, GOLD, SHARD, STEP } from './config.js';
+import { BEST_KEY, BOSS, COLORS, FIELD, GOLD, SHARD, STEP } from './config.js';
 import { createRandom } from './random.js';
-import { createWorld, EVENT_BOMB, EVENT_GOLD, EVENT_HIT, EVENT_MATCH, EVENT_OVER, EVENT_POWERUP, EVENT_SHIELD, EVENT_SPLIT } from './world.js';
+import { createWorld, EVENT_ARMOR, EVENT_BOMB, EVENT_BOSS, EVENT_GOLD, EVENT_HIT, EVENT_MATCH, EVENT_OVER, EVENT_POWERUP, EVENT_SHIELD, EVENT_SPLIT } from './world.js';
 import { ACTION_CONFIRM, ACTION_CYCLE, ACTION_PAUSE, createInput } from './input.js';
 import { createEffects } from './effects.js';
 import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
@@ -105,6 +105,18 @@ function onEvents(events) {
   if (events & EVENT_SHIELD) {
     fx.applyShake(5);
     sound.shieldBreak();
+  }
+  if (events & EVENT_ARMOR) {
+    const cx = state.player.x + 24;
+    fx.burst(cx, state.player.y - 120, '#cfd8ea', 10);
+    sound.armor();
+  }
+  if (events & EVENT_BOSS) {
+    fx.burst(FIELD.width / 2, BOSS.y, '#ffd24d', 60);
+    fx.burst(FIELD.width / 2, BOSS.y, '#ffffff', 30);
+    fx.floatText(FIELD.width / 2, BOSS.y - 40, `+${BOSS.points}`, '#ffd24d');
+    fx.applyShake(14);
+    sound.boss();
   }
   if (events & EVENT_HIT) {
     fx.applyShake(6);
