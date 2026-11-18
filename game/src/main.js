@@ -31,6 +31,8 @@ const input = createInput(canvas);
 let screen = SCREEN_TITLE;
 let best = readBest();
 let lastEvents = 0;
+let last = 0;
+let accumulator = 0;
 
 function readBest() {
   try {
@@ -165,8 +167,8 @@ function frame(now) {
 if (shot) {
   runShot(shot);
 } else {
-  let last = performance.now();
-  let accumulator = 0;
+  last = performance.now();
+  accumulator = 0;
   requestAnimationFrame(function loop(now) {
     frame(now);
     requestAnimationFrame(loop);
