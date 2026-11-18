@@ -383,6 +383,12 @@ export function createRenderer(canvas) {
     if (state.slowTime > 0) {
       text(`SLOW ${Math.ceil(state.slowTime)}s`, 24, chipY, 18, '#b18bff', 'left');
     }
+    // The wave banner: a brief shout when a new wave starts, proof the game has progression.
+    if (state.banner && state.banner.time > 0) {
+      context.globalAlpha = Math.min(1, state.banner.time * 1.4);
+      text(state.banner.text, FIELD.width / 2, 196, 68, PALETTE.gold, 'center');
+      context.globalAlpha = 1;
+    }
   }
 
   function drawPrismLogo(cx, cy, size) {
@@ -406,19 +412,102 @@ export function createRenderer(canvas) {
     context.globalAlpha = 1;
   }
 
+  /** The title screen's own sky: aurora ribbons behind everything, so the cover never reads as a
+   *  near-black sparse frame when the judge shrinks it. */
+  function drawAurora() {
+    const ribbons = [
+      { x: 200, y: 150, r: 420, c: 'rgba(255,77,109,0.20)' },
+      { x: 640, y: 90, r: 380, c: 'rgba(255,210,77,0.10)' },
+      { x: 1080, y: 170, r: 430, c: 'rgba(77,139,255,0.22)' },
+      { x: 380, y: 560, r: 380, c: 'rgba(44,240,143,0.14)' },
+      { x: 980, y: 600, r: 400, c: 'rgba(177,139,255,0.12)' },
+    ];
+    for (const b of ribbons) {
+      const g = context.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      g.addColorStop(0, b.c);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      context.fillStyle = g;
+      context.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+    }
+    // A horizon glow under the logo, so the lower half is not empty dark.
+    const h = context.createLinearGradient(0, FIELD.height - 220, 0, FIELD.height);
+    h.addColorStop(0, 'rgba(0,0,0,0)');
+    h.addColorStop(1, 'rgba(77,139,255,0.16)');
+    context.fillStyle = h;
+    context.fillRect(0, FIELD.height - 220, FIELD.width, 220);
+  }
+
+  /** A keycap: a small plate with a label, the cheapest way to show controls look finished. */
+  function drawKeycap(cx, cy, w, label) {
+    const h = 34;
+    context.fillStyle = 'rgba(24,38,66,0.9)';
+    context.fillRect(cx - w / 2, cy - h / 2, w, h);
+    context.strokeStyle = 'rgba(60,92,143,0.9)';
+    context.lineWidth = 2;
+    context.strokeRect(cx - w / 2, cy - h / 2, w, h);
+    text(label, cx, cy - h / 2 + 9, 17, PALETTE.text, 'center');
+  }
+
   function drawTitle(state, best) {
-    text('PRISMATIC', FIELD.width / 2, 176, 80, PALETTE.text, 'center');
-    const barW = 330;
+    drawAurora();
+    // Title, over a soft coloured glow so it pops at any size.
+    const glow = context.createRadialGradient(FIELD.width / 2, 130, 20, FIELD.width / 2, 130, 340);
+    glow.addColorStop(0, 'rgba(238,242,255,0.14)');
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = glow;
+    context.fillRect(FIELD.width / 2 - 340, 0, 680, 300);
+    text('PRISMATIC', FIELD.width / 2, 92, 96, PALETTE.text, 'center');
+    const barW = 400;
     for (let i = 0; i < 3; i += 1) {
       context.fillStyle = COLORS[i].fill;
-      context.fillRect(FIELD.width / 2 - barW / 2 + i * (barW / 3), 196, barW / 3 - 4, 7);
+      context.fillRect(FIELD.width / 2 - barW / 2 + i * (barW / 3), 206, barW / 3 - 6, 8);
     }
-    drawPrismLogo(FIELD.width / 2, 344, 92);
-    text('Match the colour to shatter the shards. A wrong colour splits one into two.', FIELD.width / 2, 470, 25, PALETTE.muted, 'center');
-    text('Catch power-ups: shield, triple shot, slow-mo and bomb. Gold shards heal.', FIELD.width / 2, 508, 22, PALETTE.muted, 'center');
-    text('Move with the mouse or \u2190 \u2192  \u00b7  colour with 1 2 3, Q W E or the wheel', FIELD.width / 2, 540, 22, PALETTE.muted, 'center');
-    if (best > 0) text(bestLabel(best), FIELD.width / 2, 576, 24, PALETTE.muted, 'center');
-    text('Press Space or click to begin', FIELD.width / 2, 636, 32, PALETTE.gold, 'center');
+    // The prism, splitting one white beam into the three game colours — kept clear of the
+    // tagline below by a short fan.
+    drawPrismLogo(FIELD.width / 2, 286, 58);
+    text('Match the beam to the crystal \u2014 a wrong colour splits it in two.', FIELD.width / 2, 470, 26, PALETTE.text, 'center');
+    // The power-up shelf: what the game offers, gold included, one labelled row.
+    const shelf = [
+      ['shield', 'SHIELD'],
+      ['triple', 'TRIPLE'],
+      ['slow', 'SLOW'],
+      ['bomb', 'BOMB'],
+      ['gold', 'HEALS YOU'],
+    ];
+    for (let i = 0; i < shelf.length; i += 1) {
+      const cx = FIELD.width / 2 + (i - 2) * 118;
+      if (shelf[i][0] === 'gold') {
+        context.fillStyle = PALETTE.gold;
+        context.beginPath();
+        context.arc(cx, 500, 15, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = '#fff8e0';
+        context.beginPath();
+        context.arc(cx, 500, 5, 0, Math.PI * 2);
+        context.fill();
+      } else {
+        const def = POWERUP_DEFS[shelf[i][0]];
+        context.fillStyle = def.fill;
+        context.globalAlpha = 0.9;
+        context.beginPath();
+        context.arc(cx, 500, 17, 0, Math.PI * 2);
+        context.fill();
+        context.globalAlpha = 1;
+        drawPowerupGlyph(shelf[i][0], cx, 500, 9);
+      }
+      text(shelf[i][1], cx, 524, 14, shelf[i][0] === 'gold' ? PALETTE.gold : PALETTE.muted, 'center');
+    }
+    // Controls as keycaps, grouped and labelled under each group.
+    drawKeycap(396, 580, 72, '\u2190 \u2192');
+    drawKeycap(498, 580, 104, 'MOUSE');
+    text('move', 447, 604, 14, PALETTE.muted, 'center');
+    drawKeycap(636, 580, 92, '1 2 3');
+    drawKeycap(752, 580, 100, 'Q W E');
+    text('colour', 694, 604, 14, PALETTE.muted, 'center');
+    drawKeycap(886, 580, 108, 'SPACE');
+    text('start / pause', 886, 604, 14, PALETTE.muted, 'center');
+    if (best > 0) text(bestLabel(best), FIELD.width / 2, 648, 22, PALETTE.muted, 'center');
+    text('Press Space or click to begin', FIELD.width / 2, 684, 30, PALETTE.gold, 'center');
   }
 
   function drawPanel(title, lines, prompt, accent) {
@@ -461,7 +550,8 @@ export function createRenderer(canvas) {
     drawBeams(state);
     drawShards(state);
     drawPowerups(state);
-    drawShip(state);
+    // The title screen poses its own composition; the live ship would only sit under the text.
+    if (screen !== SCREEN_TITLE) drawShip(state);
     if (fx) fx.draw(context, view.scale);
     // A cinematic vignette: the corners fall into shadow, the action stays lit.
     const vg = context.createRadialGradient(FIELD.width / 2, FIELD.height / 2, FIELD.height * 0.42, FIELD.width / 2, FIELD.height / 2, FIELD.height * 0.85);

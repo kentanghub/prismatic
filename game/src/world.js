@@ -55,6 +55,7 @@ export function createWorld(random) {
     powerupsCollected: 0,
     slowTime: 0,
     elapsed: 0,
+    banner: null,
     shardTimer: SHARD.interval,
     goldTimer: GOLD.interval,
     powerupTimer: POWERUP.interval,
@@ -81,6 +82,7 @@ export function createWorld(random) {
     state.powerupsCollected = 0;
     state.slowTime = 0;
     state.elapsed = 0;
+    state.banner = null;
     state.shardTimer = SHARD.interval;
     state.goldTimer = GOLD.interval;
     state.powerupTimer = POWERUP.interval;
@@ -209,7 +211,14 @@ export function createWorld(random) {
     let events = 0;
     state.elapsed += dt;
     state.level = Math.min(LEVEL.max, 1 + Math.floor(state.elapsed / LEVEL.seconds));
-    if (state.level > state.maxLevel) state.maxLevel = state.level;
+    if (state.level > state.maxLevel) {
+      state.maxLevel = state.level;
+      state.banner = { text: `WAVE ${state.level}`, time: 1.6 };
+    }
+    if (state.banner) {
+      state.banner.time -= dt;
+      if (state.banner.time <= 0) state.banner = null;
+    }
 
     // Steering and colour.
     if (controls.mouseX !== null && controls.mouseX !== undefined) {
