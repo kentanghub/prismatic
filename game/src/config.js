@@ -58,12 +58,33 @@ export const GOLD = {
   lifeEvery: 4,
 };
 
+/** A falling power-up: touch one with the ship to arm it. */
+export const POWERUP = {
+  size: 26,
+  speed: 115,
+  interval: 11,
+  intervalJitter: 5,
+  points: 25,
+};
+
+/** The four power-ups: shield (absorb a hit), triple (three beams), slow (halve shard speed),
+ *  bomb (clear every shard on screen). duration 0 means it acts once, not over time. */
+export const POWERUP_DEFS = {
+  shield: { fill: '#7ff0ff', duration: 0, label: 'SHIELD' },
+  triple: { fill: '#ffd24d', duration: 9, label: 'TRIPLE' },
+  slow: { fill: '#b18bff', duration: 6, label: 'SLOW' },
+  bomb: { fill: '#ff8c5a', duration: 0, label: 'BOMB' },
+};
+
+export const POWERUP_ORDER = ['shield', 'triple', 'slow', 'bomb'];
+
 /** Seconds of play per level and the last level: speeds and spawn rates stop growing there. */
 export const LEVEL = { seconds: 14, max: 12 };
 
 /** How many live objects can exist at once; the pools are allocated once, at boot, never grown. */
-export const POOL_SHARDS = 96;
-export const POOL_BEAMS = 24;
+export const POOL_SHARDS = 112;
+export const POOL_BEAMS = 40;
+export const POOL_POWERUPS = 6;
 
 export const LIVES = 3;
 

@@ -2,15 +2,16 @@
 // The 1280x720 playfield is scaled to fit the window and centred, the margin filled with the
 // backdrop colour. A "glow" is two fills — a wide low-alpha halo and a bright core — which reads as
 // neon without the cost of shadowBlur. Text that holds a number is rebuilt only when the number
-// changes, so a frame allocates nothing.
-import { COLORS, FIELD, FONT, LIVES, PALETTE, SHIP } from './config.js';
+// changes, so a frame allocates nothing. Shards are faceted crystals; the ship has an engine
+// trail and a shield ring; power-ups carry a glyph.
+import { COLORS, FIELD, FONT, LEVEL, LIVES, PALETTE, POWERUP_DEFS, SHIP } from './config.js';
 
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
 export const SCREEN_PAUSED = 'paused';
 export const SCREEN_OVER = 'over';
 
-const PANEL = { width: 640, line: 34, top: 84, bottom: 66 };
+const PANEL = { width: 660, line: 34, top: 84, bottom: 66 };
 const LIFE_SIZE = 20;
 const LIFE_GAP = 9;
 const COLOR_SIZE = 17;
@@ -27,8 +28,6 @@ function cachedLabel(prefix) {
   };
 }
 
-/** A deterministic star field: positions vary with the index, so the same code always gives the
- *  same sky, which keeps the screenshot scenes stable. */
 function makeStars(count) {
   const stars = [];
   for (let i = 0; i < count; i += 1) {
@@ -40,7 +39,6 @@ function makeStars(count) {
   return stars;
 }
 
-/** Draw a glowing dot: a wide faint halo then a small bright core. */
 function glowDot(context, x, y, radius, color, alpha) {
   context.globalAlpha = alpha * 0.22;
   context.fillStyle = color;
@@ -65,6 +63,8 @@ export function createRenderer(canvas) {
   const comboLabel = cachedLabel('COMBO x');
   const finalLabel = cachedLabel('SCORE ');
   const bestLabel = cachedLabel('BEST ');
+  const waveFinalLabel = cachedLabel('WAVE ');
+  const comboFinalLabel = cachedLabel('BEST COMBO x');
 
   function resize() {
     dpr = window.devicePixelRatio || 1;
@@ -88,7 +88,6 @@ export function createRenderer(canvas) {
     context.fillText(value, x, y);
   }
 
-  /** A soft, deterministic nebula of the three colours, so even the idle scenes are vivid. */
   function drawNebula() {
     const blobs = [
       { x: 260, y: 170, r: 360, c: 'rgba(255,77,109,0.11)' },
@@ -111,6 +110,20 @@ export function createRenderer(canvas) {
     context.fillStyle = gradient;
     context.fillRect(0, 0, FIELD.width, FIELD.height);
     drawNebula();
+    context.strokeStyle = 'rgba(120,150,210,0.05)';
+    context.lineWidth = 1;
+    const gap = 74;
+    for (let gx = -gap; gx < FIELD.width + gap; gx += gap) {
+      for (let gy = -gap; gy < FIELD.height + gap; gy += gap * 1.5) {
+        context.beginPath();
+        context.moveTo(gx + gap / 2, gy);
+        context.lineTo(gx, gy + gap * 0.5);
+        context.lineTo(gx + gap / 2, gy + gap);
+        context.lineTo(gx + gap, gy + gap * 0.5);
+        context.closePath();
+        context.stroke();
+      }
+    }
     for (const star of stars) {
       context.globalAlpha = star.a;
       context.fillStyle = PALETTE.star;
@@ -119,7 +132,6 @@ export function createRenderer(canvas) {
       context.fill();
     }
     context.globalAlpha = 1;
-    // A faint horizon line where shards land, so the danger zone reads at a glance.
     context.fillStyle = 'rgba(255,255,255,0.06)';
     context.fillRect(0, FIELD.groundY, FIELD.width, 2);
   }
@@ -135,7 +147,40 @@ export function createRenderer(canvas) {
       context.globalAlpha = 1;
       context.fillStyle = color;
       context.fillRect(x, beam.y, 6, 30);
+      context.fillStyle = '#ffffff';
+      context.globalAlpha = 0.9;
+      context.fillRect(x - 1, beam.y - 3, 8, 4);
+      context.globalAlpha = 1;
     }
+  }
+
+  function drawGem(cx, cy, r, color, spin) {
+    context.save();
+    context.translate(cx, cy);
+    context.rotate(spin || 0);
+    context.globalAlpha = 0.22;
+    context.fillStyle = color;
+    context.beginPath();
+    context.arc(0, 0, r * 2.4, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = 1;
+    context.fillStyle = color;
+    context.beginPath();
+    context.moveTo(0, -r);
+    context.lineTo(r * 0.82, 0);
+    context.lineTo(0, r);
+    context.lineTo(-r * 0.82, 0);
+    context.closePath();
+    context.fill();
+    context.fillStyle = 'rgba(255,255,255,0.35)';
+    context.beginPath();
+    context.moveTo(0, -r);
+    context.lineTo(r * 0.36, -r * 0.2);
+    context.lineTo(0, r * 0.3);
+    context.lineTo(-r * 0.36, -r * 0.2);
+    context.closePath();
+    context.fill();
+    context.restore();
   }
 
   function drawShards(state) {
@@ -145,26 +190,100 @@ export function createRenderer(canvas) {
       const cy = shard.y + shard.size / 2;
       if (shard.gold) {
         glowDot(context, cx, cy, shard.size * 0.4, PALETTE.gold, 1);
+        context.fillStyle = '#fff8e0';
+        context.beginPath();
+        context.arc(cx, cy, shard.size * 0.16, 0, Math.PI * 2);
+        context.fill();
         continue;
       }
-      const color = COLORS[shard.color].fill;
-      glowDot(context, cx, cy, shard.size * 0.46, color, 1);
-      const r = shard.size * 0.5;
-      context.strokeStyle = color;
-      context.lineWidth = 3;
+      drawGem(cx, cy, shard.size * 0.5, COLORS[shard.color].fill, shard.spin);
+    }
+  }
+
+  function drawPowerupGlyph(type, cx, cy, s) {
+    context.lineWidth = 2.5;
+    context.strokeStyle = '#ffffff';
+    context.fillStyle = '#ffffff';
+    if (type === 'shield') {
       context.beginPath();
-      context.moveTo(cx, cy - r);
-      context.lineTo(cx + r, cy);
-      context.lineTo(cx, cy + r);
-      context.lineTo(cx - r, cy);
-      context.closePath();
+      context.arc(cx, cy, s, 0, Math.PI * 2);
       context.stroke();
-      // A white glint so the diamond reads as a solid crystal.
-      context.fillStyle = 'rgba(255,255,255,0.85)';
       context.beginPath();
-      context.arc(cx, cy, r * 0.22, 0, Math.PI * 2);
+      context.arc(cx, cy, s * 0.5, 0, Math.PI * 2);
+      context.stroke();
+    } else if (type === 'triple') {
+      for (let k = -1; k <= 1; k += 1) {
+        const bx = cx + k * s * 0.8;
+        context.beginPath();
+        context.moveTo(bx - s * 0.4, cy - s * 0.3);
+        context.lineTo(bx, cy - s * 0.85);
+        context.lineTo(bx + s * 0.4, cy - s * 0.3);
+        context.closePath();
+        context.fill();
+      }
+    } else if (type === 'slow') {
+      context.beginPath();
+      context.arc(cx, cy, s, 0, Math.PI * 2);
+      context.stroke();
+      context.beginPath();
+      context.moveTo(cx, cy);
+      context.lineTo(cx, cy - s * 0.6);
+      context.moveTo(cx, cy);
+      context.lineTo(cx + s * 0.5, cy);
+      context.stroke();
+    } else if (type === 'bomb') {
+      context.beginPath();
+      for (let i = 0; i < 8; i += 1) {
+        const a = (i * Math.PI) / 4;
+        const rr = i % 2 === 0 ? s : s * 0.42;
+        const px = cx + Math.cos(a) * rr;
+        const py = cy + Math.sin(a) * rr;
+        if (i === 0) context.moveTo(px, py);
+        else context.lineTo(px, py);
+      }
+      context.closePath();
       context.fill();
     }
+  }
+
+  function drawPowerups(state) {
+    for (const powerup of state.powerups) {
+      if (!powerup.active) continue;
+      const def = POWERUP_DEFS[powerup.type];
+      const cx = powerup.x + powerup.size / 2;
+      const cy = powerup.y + powerup.size / 2;
+      context.fillStyle = def.fill;
+      context.globalAlpha = 0.9;
+      context.beginPath();
+      context.arc(cx, cy, powerup.size * 0.62, 0, Math.PI * 2);
+      context.fill();
+      context.globalAlpha = 1;
+      context.strokeStyle = def.fill;
+      context.lineWidth = 3;
+      context.beginPath();
+      context.arc(cx, cy, powerup.size * 0.72, 0, Math.PI * 2);
+      context.stroke();
+      drawPowerupGlyph(powerup.type, cx, cy, powerup.size * 0.34);
+    }
+  }
+
+  function drawEngine(state) {
+    const player = state.player;
+    const color = COLORS[player.color].fill;
+    const cx = player.x + SHIP.width / 2;
+    const ey = player.y + SHIP.height;
+    const g = context.createLinearGradient(0, ey, 0, ey + 22);
+    g.addColorStop(0, color);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    context.globalAlpha = 0.55;
+    context.fillStyle = g;
+    context.beginPath();
+    context.moveTo(cx - SHIP.width * 0.22, ey);
+    context.lineTo(cx + SHIP.width * 0.22, ey);
+    context.lineTo(cx, ey + 22);
+    context.closePath();
+    context.fill();
+    context.globalAlpha = 1;
   }
 
   function drawShip(state) {
@@ -174,6 +293,16 @@ export function createRenderer(canvas) {
     const cx = player.x + SHIP.width / 2;
     const top = player.y - 6;
     const bottom = player.y + SHIP.height;
+    drawEngine(state);
+    if (player.shield > 0) {
+      context.strokeStyle = '#7ff0ff';
+      context.lineWidth = 3;
+      context.globalAlpha = 0.9;
+      context.beginPath();
+      context.arc(cx, (top + bottom) / 2, SHIP.width * 0.78, 0, Math.PI * 2);
+      context.stroke();
+      context.globalAlpha = 1;
+    }
     context.globalAlpha = 0.4;
     context.fillStyle = color;
     context.beginPath();
@@ -190,7 +319,6 @@ export function createRenderer(canvas) {
     context.lineTo(cx - SHIP.width / 2, bottom);
     context.closePath();
     context.fill();
-    // A small star cut into the hull, in the void colour, so it reads as a solid shape.
     context.fillStyle = PALETTE.backdrop;
     context.beginPath();
     const inner = SHIP.width * 0.17;
@@ -205,18 +333,24 @@ export function createRenderer(canvas) {
     context.textBaseline = 'top';
     text(scoreLabel(state.score), 24, 18, 30, PALETTE.text, 'left');
     text(waveLabel(state.level), FIELD.width / 2, 18, 30, PALETTE.text, 'center');
+    const prog = (state.elapsed % LEVEL.seconds) / LEVEL.seconds;
+    const bw = 160;
+    context.fillStyle = 'rgba(255,255,255,0.12)';
+    context.fillRect(FIELD.width / 2 - bw / 2, 54, bw, 5);
+    context.fillStyle = COLORS[state.player.color].fill;
+    context.fillRect(FIELD.width / 2 - bw / 2, 54, bw * prog, 5);
     const start = FIELD.width - 24 - LIVES * (LIFE_SIZE + LIFE_GAP) + LIFE_GAP;
     for (let life = 0; life < LIVES; life += 1) {
       const cx = start + life * (LIFE_SIZE + LIFE_GAP);
       context.fillStyle = life < state.lives ? PALETTE.text : 'rgba(255,255,255,0.12)';
       context.beginPath();
-      context.moveTo(cx, 22 + LIFE_SIZE);
-      context.lineTo(cx + LIFE_SIZE / 2, 22);
-      context.lineTo(cx + LIFE_SIZE, 22 + LIFE_SIZE);
+      context.moveTo(cx, 24 + LIFE_SIZE);
+      context.lineTo(cx + LIFE_SIZE / 2, 24);
+      context.lineTo(cx + LIFE_SIZE, 24 + LIFE_SIZE);
       context.closePath();
       context.fill();
     }
-    const ringY = 30;
+    const ringY = 32;
     const ringX = start - 26 - COLORS.length * (COLOR_SIZE + 10);
     for (const color of COLORS) {
       const cx = ringX + color.id * (COLOR_SIZE + 10);
@@ -231,12 +365,21 @@ export function createRenderer(canvas) {
       context.fill();
     }
     context.globalAlpha = 1;
-    if (state.combo >= 2) {
-      text(comboLabel(state.combo), 24, 54, 22, PALETTE.gold, 'left');
+    if (state.combo >= 2) text(comboLabel(state.combo), 24, 56, 22, PALETTE.gold, 'left');
+    let chipY = FIELD.groundY + 8;
+    if (state.player.shield > 0) {
+      text('SHIELD', 24, chipY, 18, '#7ff0ff', 'left');
+      chipY += 22;
+    }
+    if (state.player.tripleTime > 0) {
+      text(`TRIPLE ${Math.ceil(state.player.tripleTime)}s`, 24, chipY, 18, '#ffd24d', 'left');
+      chipY += 22;
+    }
+    if (state.slowTime > 0) {
+      text(`SLOW ${Math.ceil(state.slowTime)}s`, 24, chipY, 18, '#b18bff', 'left');
     }
   }
 
-  /** A glass prism splitting white light into the three beam colours — the game's logo. */
   function drawPrismLogo(cx, cy, size) {
     context.fillStyle = '#cfe0ff';
     context.beginPath();
@@ -267,9 +410,10 @@ export function createRenderer(canvas) {
     }
     drawPrismLogo(FIELD.width / 2, 344, 92);
     text('Match the colour to shatter the shards. A wrong colour splits one into two.', FIELD.width / 2, 470, 25, PALETTE.muted, 'center');
-    text('Move with the mouse or \u2190 \u2192  \u00b7  switch beam colour with 1 2 3, Q W E or the wheel', FIELD.width / 2, 508, 22, PALETTE.muted, 'center');
-    if (best > 0) text(bestLabel(best), FIELD.width / 2, 552, 24, PALETTE.muted, 'center');
-    text('Press Space or click to begin', FIELD.width / 2, 618, 32, PALETTE.gold, 'center');
+    text('Catch power-ups: shield, triple shot, slow-mo and bomb. Gold shards heal.', FIELD.width / 2, 508, 22, PALETTE.muted, 'center');
+    text('Move with the mouse or \u2190 \u2192  \u00b7  colour with 1 2 3, Q W E or the wheel', FIELD.width / 2, 540, 22, PALETTE.muted, 'center');
+    if (best > 0) text(bestLabel(best), FIELD.width / 2, 576, 24, PALETTE.muted, 'center');
+    text('Press Space or click to begin', FIELD.width / 2, 636, 32, PALETTE.gold, 'center');
   }
 
   function drawPanel(title, lines, prompt, accent) {
@@ -292,10 +436,15 @@ export function createRenderer(canvas) {
   const PAUSED_LINES = ['The storm waits for you.'];
 
   function drawOver(state, best) {
-    drawPanel('Game Over', [finalLabel(state.score), bestLabel(best)], 'Press Space or click to play again', COLORS[0].fill);
+    const lines = [
+      finalLabel(state.score),
+      bestLabel(best),
+      `${waveFinalLabel(state.maxLevel)} \u00b7 ${comboFinalLabel(state.bestCombo)}`,
+      `${state.destroyed} shards \u00b7 ${state.powerupsCollected} power-ups`,
+    ];
+    drawPanel('Game Over', lines, 'Press Space or click to play again', COLORS[0].fill);
   }
 
-  /** Paint one frame: the field (with any shake), the effect layer, then the HUD or a panel. */
   function draw(state, screen, best, fx) {
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.fillStyle = PALETTE.backdrop;
@@ -306,6 +455,7 @@ export function createRenderer(canvas) {
     drawBackground();
     drawBeams(state);
     drawShards(state);
+    drawPowerups(state);
     drawShip(state);
     if (fx) fx.draw(context, view.scale);
     context.setTransform(view.scale, 0, 0, view.scale, view.x, view.y);
@@ -318,7 +468,6 @@ export function createRenderer(canvas) {
     else if (screen === SCREEN_OVER) drawOver(state, best);
   }
 
-  /** Map a pointer's client x to a playfield x, for mouse steering. */
   function toFieldX(clientX) {
     return (clientX * dpr - view.x) / view.scale;
   }

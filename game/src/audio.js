@@ -59,6 +59,20 @@ export const sound = {
     note(880, 0.08, 0.16);
     note(1100, 0.12, 0.18);
   },
+  /** Power-up catch: a rising two-note sparkle. */
+  powerup() {
+    note(523, 0.07, 0.16);
+    note(784, 0.1, 0.18);
+  },
+  /** Bomb: a low, wide detonation. */
+  bomb() {
+    note(90, 0.5, 0.3, 40);
+    note(180, 0.3, 0.12, 120);
+  },
+  /** Shield break: a short metallic clink. */
+  shieldBreak() {
+    note(660, 0.08, 0.14, 520);
+  },
   /** Colour switch: a tiny rising blip. */
   switchc() {
     note(520, 0.05, 0.1);

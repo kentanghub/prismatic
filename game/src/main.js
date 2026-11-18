@@ -4,9 +4,9 @@
 // title, play, paused and game over. ?seed=N fixes the random stream; ?shot=start|play|end (with
 // &seed=N) stages that scene instead of running the loop and sets window.__shotReady for a
 // screenshot, as the kit's shots.json drives.
-import { BEST_KEY, COLORS, GOLD, SHARD, STEP } from './config.js';
+import { BEST_KEY, COLORS, FIELD, GOLD, SHARD, STEP } from './config.js';
 import { createRandom } from './random.js';
-import { createWorld, EVENT_GOLD, EVENT_HIT, EVENT_MATCH, EVENT_OVER, EVENT_SPLIT } from './world.js';
+import { createWorld, EVENT_BOMB, EVENT_GOLD, EVENT_HIT, EVENT_MATCH, EVENT_OVER, EVENT_POWERUP, EVENT_SHIELD, EVENT_SPLIT } from './world.js';
 import { ACTION_CONFIRM, ACTION_CYCLE, ACTION_PAUSE, createInput } from './input.js';
 import { createEffects } from './effects.js';
 import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
@@ -86,6 +86,23 @@ function onEvents(events) {
     fx.burst(cx, state.player.y - 90, '#ffd24d', 20);
     fx.floatText(cx, state.player.y - 130, `+${GOLD.points}`, '#ffd24d');
     sound.gold();
+  }
+  if (events & EVENT_POWERUP) {
+    const cx = state.player.x + 24;
+    const color = COLORS[state.player.color].fill;
+    fx.burst(cx, state.player.y - 60, color, 18);
+    fx.floatText(cx, state.player.y - 90, '+POWER', color);
+    sound.powerup();
+  }
+  if (events & EVENT_BOMB) {
+    fx.burst(FIELD.width / 2, FIELD.height / 2, '#ff8c5a', 60);
+    fx.burst(FIELD.width / 2, FIELD.height / 2, '#ffffff', 30);
+    fx.applyShake(12);
+    sound.bomb();
+  }
+  if (events & EVENT_SHIELD) {
+    fx.applyShake(5);
+    sound.shieldBreak();
   }
   if (events & EVENT_HIT) {
     fx.applyShake(6);

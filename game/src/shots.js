@@ -9,7 +9,7 @@ import { EVENT_OVER } from './world.js';
 import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
 
 const START_SECONDS = 5;
-const PLAY_SECONDS = 30;
+const PLAY_SECONDS = 45;
 const END_LIMIT_SECONDS = 300;
 
 /** Pick the lowest active shard (the one nearest the bottom edge), ignoring gold. */
