@@ -164,7 +164,10 @@ export function stageShot(name, world) {
   // Two low shards on the left: near-misses read as tension, and they fill the empty corner.
   placeShard(state, 140, 596, 2, 150, 2.5);
   placeShard(state, 258, 618, 1, 143, 4.4);
-  // A scatter across the field: every colour, several heights, all mid-fall.
+  // A scatter across the field: every colour, several heights, all mid-fall — plus one of each
+  // new shard kind, so the variety reads in this frame too.
+  placeShard(state, 700, 300, 1, 160, 3.1, { armor: true });
+  placeShard(state, 420, 420, 2, 155, 2.4, { drift: true });
   placeShard(state, 232, 250, 1, 171, 1.2);
   placeShard(state, 322, 84, 2, 163, 5.0);
   placeShard(state, 452, 180, 1, 145, 0.1);
