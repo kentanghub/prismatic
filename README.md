@@ -15,6 +15,11 @@ the gold shards for bonus points, and survive the ever-faster waves.
 - 🎯 **Match the colour** to destroy a shard — the wrong colour splits it.
 - 🔥 Consecutive matches build a **combo multiplier**.
 - 💛 **Gold shards** are worth points, and a life now and then.
+- 🛡 **Armoured shards** wear a steel ring — one beam strips it, the next shatters the gem.
+- 🌀 **Drifter shards** ride a sine wave; their ghost trail shows the path.
+- ⚡ **Power-ups**: shield (absorb a hit), triple (three beams), slow-mo, and bomb (clear the screen).
+- 🦂 **Prism Titan** — every fourth wave a three-layer boss crystal owns the sky, soaks your beams
+  and hurries its brood; break it for +500 points and a life back.
 
 ## Controls
 
@@ -36,8 +41,8 @@ or open `game/index.html` directly in a desktop browser.
 
 - `game/index.html` — the page shell
 - `game/src/main.js` — boot and the fixed-timestep loop
-- `game/src/world.js` — rules and state (matching, splitting, combo, waves)
-- `game/src/render.js` — all drawing (HUD, panels, neon glow)
+- `game/src/world.js` — rules and state (matching, splitting, combo, waves, boss)
+- `game/src/render.js` — all drawing (HUD, panels, neon glow, the titan)
 - `game/src/config.js` — tuning and palette
 - `game/src/input.js` — keyboard + mouse
 - `game/src/audio.js` — Web Audio synthesis (no audio files)
@@ -45,7 +50,7 @@ or open `game/index.html` directly in a desktop browser.
 - `game/src/shots.js` — deterministic scenes for the `?shot=` screenshots
 - `game/src/random.js` — seeded RNG
 - `main.ts` — the hand-in program (Node 22, builds the dossier)
-- `screenshots/` — the three submission screenshots
+- `screenshots/` — the four submission screenshots
 
 [![make.fun · best-game-01](https://make.fun/badge/best-game-01.svg)](https://make.fun/bounty/best-game-01)
 
