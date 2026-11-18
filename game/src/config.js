@@ -21,14 +21,14 @@ export const COLORS = [
 export const SHIP = {
   width: 56,
   height: 40,
-  speed: 660,
+  speed: 760,
   invulnerable: 1.4,
   y: FIELD.groundY - 56,
 };
 
 export const BEAM = {
   width: 6,
-  speed: 780,
+  speed: 950,
   fireInterval: 0.14,
   max: 24,
 };
@@ -36,12 +36,12 @@ export const BEAM = {
 /** A falling shard: size, speed and how it grows each level, and how a wrong-colour hit splits it. */
 export const SHARD = {
   size: 44,
-  speed: 150,
-  speedPerLevel: 26,
-  speedJitter: 70,
-  interval: 0.55,
-  intervalScale: 0.9,
-  minInterval: 0.16,
+  speed: 118,
+  speedPerLevel: 16,
+  speedJitter: 50,
+  interval: 0.75,
+  intervalScale: 0.93,
+  minInterval: 0.3,
   splitCount: 2,
   splitLevelFade: 0.5,
   points: 10,
@@ -61,9 +61,9 @@ export const GOLD = {
 /** A falling power-up: touch one with the ship to arm it. */
 export const POWERUP = {
   size: 26,
-  speed: 115,
-  interval: 11,
-  intervalJitter: 5,
+  speed: 95,
+  interval: 8,
+  intervalJitter: 3,
   points: 25,
 };
 

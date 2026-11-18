@@ -24,6 +24,8 @@ const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() 
 const canvas = document.getElementById('game');
 const status = document.getElementById('status');
 const world = createWorld(createRandom(seed));
+// Debug telemetry: the test harness reads the live state from here.
+if (typeof window !== 'undefined') window.__world = world;
 const fx = createEffects();
 const renderer = createRenderer(canvas);
 const input = createInput(canvas);
@@ -128,6 +130,15 @@ function liveControls() {
 function runShot(name) {
   const scene = stageShot(name, world);
   best = Math.max(best, scene.best);
+  // Curated scenes seed their own juice: bursts where a shard "just" shattered, the score it paid.
+  if (scene.seedFx) {
+    for (const seed of scene.seedFx) {
+      if (seed.kind === 'text') fx.floatText(seed.x, seed.y, seed.text, seed.color);
+      else if (seed.kind === 'shake') fx.applyShake(seed.amount);
+      else fx.burst(seed.x, seed.y, seed.color, seed.count);
+    }
+    for (let k = 0; k < 7; k += 1) fx.update(0.02);
+  }
   let painted = 0;
   function paint() {
     renderer.draw(world.state, scene.screen, scene.best, fx);

@@ -141,9 +141,9 @@ export function createRenderer(canvas) {
       if (!beam.active) continue;
       const color = COLORS[beam.color].fill;
       const x = beam.x + 3;
-      context.globalAlpha = 0.3;
+      context.globalAlpha = 0.35;
       context.fillStyle = color;
-      context.fillRect(x - 4, beam.y - 6, 14, 40);
+      context.fillRect(x - 7, beam.y - 8, 20, 44);
       context.globalAlpha = 1;
       context.fillStyle = color;
       context.fillRect(x, beam.y, 6, 30);
@@ -158,7 +158,7 @@ export function createRenderer(canvas) {
     context.save();
     context.translate(cx, cy);
     context.rotate(spin || 0);
-    context.globalAlpha = 0.22;
+    context.globalAlpha = 0.3;
     context.fillStyle = color;
     context.beginPath();
     context.arc(0, 0, r * 2.4, 0, Math.PI * 2);
@@ -335,19 +335,21 @@ export function createRenderer(canvas) {
     text(waveLabel(state.level), FIELD.width / 2, 18, 30, PALETTE.text, 'center');
     const prog = (state.elapsed % LEVEL.seconds) / LEVEL.seconds;
     const bw = 160;
-    context.fillStyle = 'rgba(255,255,255,0.12)';
+    context.fillStyle = 'rgba(255,255,255,0.22)';
     context.fillRect(FIELD.width / 2 - bw / 2, 54, bw, 5);
     context.fillStyle = COLORS[state.player.color].fill;
     context.fillRect(FIELD.width / 2 - bw / 2, 54, bw * prog, 5);
+    // Lives, as hearts: the one icon that needs no label.
     const start = FIELD.width - 24 - LIVES * (LIFE_SIZE + LIFE_GAP) + LIFE_GAP;
     for (let life = 0; life < LIVES; life += 1) {
-      const cx = start + life * (LIFE_SIZE + LIFE_GAP);
-      context.fillStyle = life < state.lives ? PALETTE.text : 'rgba(255,255,255,0.12)';
+      const cx = start + life * (LIFE_SIZE + LIFE_GAP) + LIFE_SIZE / 2;
+      const cy = 24 + LIFE_SIZE / 2;
+      const s = LIFE_SIZE * 0.42;
+      context.fillStyle = life < state.lives ? PALETTE.text : 'rgba(255,255,255,0.14)';
       context.beginPath();
-      context.moveTo(cx, 24 + LIFE_SIZE);
-      context.lineTo(cx + LIFE_SIZE / 2, 24);
-      context.lineTo(cx + LIFE_SIZE, 24 + LIFE_SIZE);
-      context.closePath();
+      context.moveTo(cx, cy + s);
+      context.bezierCurveTo(cx - s * 1.5, cy - s * 0.3, cx - s * 0.7, cy - s * 1.2, cx, cy - s * 0.35);
+      context.bezierCurveTo(cx + s * 0.7, cy - s * 1.2, cx + s * 1.5, cy - s * 0.3, cx, cy + s);
       context.fill();
     }
     const ringY = 32;
@@ -363,17 +365,20 @@ export function createRenderer(canvas) {
       context.lineTo(cx - COLOR_SIZE, ringY);
       context.closePath();
       context.fill();
+      // The key that selects this colour, under its diamond: the legend doubles as a control hint.
+      text(String(color.id + 1), cx, ringY + COLOR_SIZE + 6, 13, PALETTE.muted, 'center');
     }
     context.globalAlpha = 1;
     if (state.combo >= 2) text(comboLabel(state.combo), 24, 56, 22, PALETTE.gold, 'left');
-    let chipY = FIELD.groundY + 8;
+    // Active-effect chips, top-left under the score, where nothing clips at the field edge.
+    let chipY = 84;
     if (state.player.shield > 0) {
       text('SHIELD', 24, chipY, 18, '#7ff0ff', 'left');
-      chipY += 22;
+      chipY += 24;
     }
     if (state.player.tripleTime > 0) {
       text(`TRIPLE ${Math.ceil(state.player.tripleTime)}s`, 24, chipY, 18, '#ffd24d', 'left');
-      chipY += 22;
+      chipY += 24;
     }
     if (state.slowTime > 0) {
       text(`SLOW ${Math.ceil(state.slowTime)}s`, 24, chipY, 18, '#b18bff', 'left');
@@ -458,6 +463,12 @@ export function createRenderer(canvas) {
     drawPowerups(state);
     drawShip(state);
     if (fx) fx.draw(context, view.scale);
+    // A cinematic vignette: the corners fall into shadow, the action stays lit.
+    const vg = context.createRadialGradient(FIELD.width / 2, FIELD.height / 2, FIELD.height * 0.42, FIELD.width / 2, FIELD.height / 2, FIELD.height * 0.85);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(2,2,12,0.34)');
+    context.fillStyle = vg;
+    context.fillRect(0, 0, FIELD.width, FIELD.height);
     context.setTransform(view.scale, 0, 0, view.scale, view.x, view.y);
     if (screen === SCREEN_TITLE) {
       drawTitle(state, best);
